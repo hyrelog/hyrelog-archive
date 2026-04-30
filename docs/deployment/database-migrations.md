@@ -2,7 +2,9 @@
 
 > **Compliance mode:** `DATABASE_URL_US`, `DATABASE_URL_EU`, `DATABASE_URL_UK`, and `DATABASE_URL_AU` should target **different regional database deployments**. This guide assumes strict regional separation.
 >
-> Primary runbook: [STEP_BY_STEP_AWS.md](./STEP_BY_STEP_AWS.md)
+> **API migrations to AWS RDS from scratch:** [APPLY_API_MIGRATIONS_AWS_FROM_SCRATCH.md](./APPLY_API_MIGRATIONS_AWS_FROM_SCRATCH.md)  
+> **Operator runbook (migrations + optional full reset + building URLs from RDS secrets):** [MIGRATIONS_AND_FULL_RESET_RUNBOOK.md](./MIGRATIONS_AND_FULL_RESET_RUNBOOK.md)  
+> Primary infra walkthrough: [STEP_BY_STEP_AWS.md](./STEP_BY_STEP_AWS.md)
 
 ## 1. Dashboard migrations
 
