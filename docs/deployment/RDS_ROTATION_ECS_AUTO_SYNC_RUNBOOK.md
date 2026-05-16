@@ -34,6 +34,22 @@ aws ecs wait services-stable \
   --services "$API_SERVICE"
 ```
 
+### Lambda runtime (Node.js 20 EOL on AWS)
+
+The redeploy Lambda `hyrelog-prod-rds-rotation-ecs-redeploy` should use a supported managed runtime (use **`nodejs22.x`**). This does not require re-zipping the function unless you change dependencies.
+
+```bash
+export PRIMARY_REGION='ap-southeast-2'
+export LAMBDA_FUNCTION_NAME='hyrelog-prod-rds-rotation-ecs-redeploy'
+
+aws lambda update-function-configuration \
+  --region "$PRIMARY_REGION" \
+  --function-name "$LAMBDA_FUNCTION_NAME" \
+  --runtime nodejs22.x
+```
+
+Then smoke-test (same as [§5](#5-validate-setup)) and confirm the function configuration shows `nodejs22.x`.
+
 ---
 
 ## 1) One-time variables
@@ -187,7 +203,7 @@ zip -q function.zip index.mjs
 aws lambda create-function \
   --region "$PRIMARY_REGION" \
   --function-name "$LAMBDA_FUNCTION_NAME" \
-  --runtime nodejs20.x \
+  --runtime nodejs22.x \
   --handler index.handler \
   --role "$LAMBDA_ROLE_ARN" \
   --zip-file fileb://function.zip \
@@ -213,6 +229,7 @@ aws lambda update-function-code \
 aws lambda update-function-configuration \
   --region "$PRIMARY_REGION" \
   --function-name "$LAMBDA_FUNCTION_NAME" \
+  --runtime nodejs22.x \
   --environment "Variables={ECS_CLUSTER=$ECS_CLUSTER,ECS_SERVICES=$API_SERVICE}"
 ```
 
