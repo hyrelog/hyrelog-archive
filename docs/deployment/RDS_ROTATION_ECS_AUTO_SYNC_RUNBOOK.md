@@ -17,6 +17,31 @@ It is written for your current prod setup:
 
 ## 0) Immediate fix (do this now)
 
+**Why login/API breaks after rotation**
+
+| Service | How it gets DB password | After RDS rotates |
+|---------|-------------------------|-----------------|
+| **API / worker** | RDS JSON secret → `DB_PASSWORD_*` → entrypoint builds `DATABASE_URL_*` | Redeploy picks up new password automatically |
+| **Dashboard** | Static secret `hyrelog-prod/DATABASE_URL` (full URL) | Secret is **stale** until you sync it; redeploy alone is not enough |
+
+Dashboard RDS (`hyrelog-prod-dashboard`) has its **own** rotation secret (`rds!db-8790c16b-...` in `ap-southeast-2`). It is **not** in the EventBridge rule below (that rule only lists the four **regional API** secrets).
+
+**Recommended one-shot fix** (from `hyrelog-api` repo root):
+
+```bash
+bash scripts/deployment/sync-secrets-after-rds-rotation.sh
+```
+
+Windows (PowerShell):
+
+```powershell
+.\scripts\deployment\sync-secrets-after-rds-rotation.ps1
+```
+
+That script rebuilds `hyrelog-prod/DATABASE_URL` from the current dashboard RDS secret, then force-redeploys `hyrelog-api`, `hyrelog-worker`, and `hyrelog-dashboard`.
+
+**API/worker only** (if dashboard auth DB is fine):
+
 ```bash
 export PRIMARY_REGION='ap-southeast-2'
 export ECS_CLUSTER='hyrelog-prod-ecs'
@@ -32,6 +57,15 @@ aws ecs wait services-stable \
   --region "$PRIMARY_REGION" \
   --cluster "$ECS_CLUSTER" \
   --services "$API_SERVICE"
+```
+
+Also redeploy **worker** and **dashboard** when regional API passwords or the dashboard DB password rotated:
+
+```bash
+for svc in hyrelog-api hyrelog-worker hyrelog-dashboard; do
+  aws ecs update-service --region ap-southeast-2 --cluster hyrelog-prod-ecs --service "$svc" --force-new-deployment
+done
+aws ecs wait services-stable --region ap-southeast-2 --cluster hyrelog-prod-ecs --services hyrelog-api hyrelog-worker hyrelog-dashboard
 ```
 
 ### Lambda runtime (Node.js 20 EOL on AWS)
@@ -392,7 +426,9 @@ aws ecs update-service \
 ## Notes
 
 - This automation watches rotation API calls via CloudTrail and redeploys API service.
-- If you later also want worker auto-redeploy, set Lambda env `ECS_SERVICES=hyrelog-api,hyrelog-worker`.
+- Set Lambda env `ECS_SERVICES=hyrelog-api,hyrelog-worker,hyrelog-dashboard` so all three restart after regional API secret rotation.
+- **Dashboard auth DB** rotation still requires syncing `hyrelog-prod/DATABASE_URL` (see `sync-secrets-after-rds-rotation.sh`) unless you migrate the dashboard task to RDS JSON secrets + entrypoint like API/worker.
+- Add the dashboard RDS secret ARN to EventBridge (or a second rule) if you want automation when **only** the dashboard instance rotates.
 - In Git Bash, ARNs containing `!` should be single-quoted if used directly in shell commands.
 - On Windows Git Bash, keep temp JSON/zip files in the repo (like `scripts/deployment/tmp`) instead of `/tmp` for consistent `file://` behavior with AWS CLI.
 - On AWS CLI v2, `aws lambda invoke` with inline JSON payload needs `--cli-binary-format raw-in-base64-out`.
